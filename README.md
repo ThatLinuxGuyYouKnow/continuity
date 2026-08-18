@@ -10,7 +10,7 @@ Built for the **CockroachDB × AWS Hackathon — Build with Agentic Memory**. Co
 
 ## Architecture
 
-![Continuity Architecture](public/architecture.jpg)
+![Continuity Architecture](https://raw.githubusercontent.com/ThatLinuxGuyYouKnow/continuity/main/docs/architecture.jpg)
 
 ## How the agent works (the loop)
 
@@ -156,7 +156,7 @@ scripts/                 Backfill utilities
 
 - Live app: _add your deployed URL_
 - Demo video: _add YouTube/Vimeo link_
-- Architecture diagram: `public/architecture.jpg` (inline below)
+- Architecture diagram: `docs/architecture.jpg`
 
 ## License
 

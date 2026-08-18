@@ -6,7 +6,7 @@ We asked: what if an AI agent could remember *every* patient interaction, not ju
 
 Continuity is that agent. It stores, retrieves, and reasons over patient memory using CockroachDB as its persistent backbone, with Amazon Bedrock models powering the intelligence. The name says everything: in healthcare, continuity of memory *is* continuity of care.
 
-![Continuity Architecture](public/architecture.jpg)
+![Continuity Architecture](https://raw.githubusercontent.com/ThatLinuxGuyYouKnow/continuity/main/docs/architecture.jpg)
 
 ---
 
