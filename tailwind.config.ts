@@ -29,7 +29,7 @@ const config: Config = {
         dark: "#0A1628",
         surface: "#f8f9fb",
         muted: "#f0f2f5",
-        panel: "#f4f5f7",
+        panel: "#ffffff",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],

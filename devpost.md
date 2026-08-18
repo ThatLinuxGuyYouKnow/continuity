@@ -6,19 +6,19 @@ We asked: what if an AI agent could remember *every* patient interaction, not ju
 
 Continuity is that agent. It stores, retrieves, and reasons over patient memory using CockroachDB as its persistent backbone, with Amazon Bedrock models powering the intelligence. The name says everything: in healthcare, continuity of memory *is* continuity of care.
 
+![Continuity Architecture](public/architecture.jpg)
+
 ---
 
 ## What it does
 
-Continuity is an agentic clinical memory platform with five core capabilities:
+Continuity turns fragmented health records into a persistent, agentic memory layer. In a chat interface, clinicians ask questions, and the agent reasons over that memory using a Bedrock-powered tool-call loop — deciding which tools to invoke, executing them against CockroachDB, and synthesizing a sourced answer.
 
-**1. Agentic Memory Retrieval.** A chat interface where clinicians ask questions like "Show me Lucas's key medical history and all active allergies." The agent doesn't just search a database; it reasons. Using a Bedrock-powered tool-call loop, it decides which tools to invoke (memory search, emergency summary, document lookup), executes them against CockroachDB, synthesizes the results, and returns a structured answer with sourced facts and confidence scores.
+**1. Agentic Memory Retrieval.** A clinician asks "Show me Lucas's key medical history and all active allergies." The agent doesn't just search a database — it reasons. Using a Bedrock-powered tool-call loop, it decides which tools to invoke (memory search, emergency summary, document lookup), executes them against CockroachDB, synthesizes the results, and returns a structured answer with sourced facts and confidence scores.
 
 **2. Document Ingestion Pipeline.** Clinicians upload clinical documents (charts, notes, labs) directly to S3 via presigned URLs. An S3-triggered Lambda reads the document, sends it to Bedrock Nova Micro for medical fact extraction, embeds each fact via Bedrock Titan, and stores the structured memory entries in CockroachDB with HNSW vector indexes. The pipeline is fully serverless and event-driven.
 
-**3. Emergency Break-Glass Access.** For situations where a patient can't provide history, the system generates signed, time-limited capability URLs with QR codes. An ER clinician scans the code, enters a reason code (mandatory for audit), and gets immediate access to the emergency summary: allergies, medications, conditions, emergency contacts. Every access is logged to a global audit trail. Links can be revoked in real-time.
-
-![Break-glass access](https://raw.githubusercontent.com/ThatLinuxGuyYouKnow/continuity/main/docs/gifs/break-glass.gif)
+**3. Emergency Break-Glass Access.** For situations where a patient can't provide history, the system generates signed, 60-minute capability URLs with QR codes. An ER clinician scans the code, enters a reason code (mandatory for audit), and gets immediate access to the emergency summary: allergies, medications, conditions, emergency contacts. Every access is logged to a global audit trail. Links can be revoked before expiry.
 
 **4. Multi-Region Memory.** The patient record lives across three CockroachDB regions (us-east-1, us-west-2, eu-central-1). When a patient arrives at an ER on a different continent, the agent reads from a memory that was written hours ago on another continent, with zero data loss and no manual replication.
 
@@ -68,6 +68,49 @@ The break-glass system has two paths: a direct API call (for clinicians in the a
 ### The Frontend (Next.js 15)
 
 The dashboard renders real-time counts from CockroachDB via the overview API. The agent chat returns structured widget cards (patient profile, memory hits with confidence bars, allergies, medications, sources) rendered inline with the conversation. The documents page shows upload status, file types, and ingestion progress. The compliance page displays the full audit trail.
+
+---
+
+## Meaningful integration of CockroachDB and AWS
+
+CockroachDB is the agent's memory layer, not a bolt-on. Every agent action reads from or writes to the same PostgreSQL-compatible cluster, and the CockroachDB tools we selected are load-bearing: the agent cannot answer a question without them. We used **3 of the 4 required CockroachDB tools** plus four AWS services.
+
+### CockroachDB Distributed Vector Indexing (the retrieval core)
+
+This is the heart of the agent. Memory is stored in `memory_entries`, `documents`, and `evidence_findings`, each with a `VECTOR(1024)` column backed by an **HNSW index** (`vector_l2_ops`) created via `ccloud sql`. When a clinician asks a question:
+
+1. The query is embedded by Amazon Titan into a 1024-dimensional vector.
+2. The agent runs `SELECT ... ORDER BY embedding <-> $2::vector` against the HNSW index (`lib/continuity.ts`).
+3. Semantically ranked facts come back with category, confidence, and source attribution.
+
+This is the path every chat message, emergency summary, and document lookup flows through. Embeddings are written at ingest time by the Lambda and backfilled for legacy rows by `scripts/backfill-embeddings.mjs`, so vector data and operational data live in the same table, with zero consistency gap and no separate vector store to maintain.
+
+### ccloud CLI (the control plane)
+
+The agent-ready ccloud CLI provisions and operates the whole environment from the terminal, with JSON output and service-account RBAC:
+- Cluster provisioning and multi-region configuration of `brave-snapper` (us-east-1, us-west-2, eu-central-1).
+- Schema and migration execution, including creating the HNSW vector indexes (`CREATE INDEX ... USING hnsw ... vector_l2_ops`), via `ccloud sql`.
+- Connection string management and backup oversight.
+
+So the ccloud CLI is how the cluster was provisioned and how the vector indexes were actually created, not a one-line mention.
+
+### Cloud Managed MCP Server (operator + agent gateway)
+
+We connect tooling to `brave-snapper` through the Cloud Console's managed MCP Server, running in read-only mode with full audit logging, so a judge can point an MCP-compatible agent (Claude, Cursor, VS Code) at the cluster with the single config snippet and inspect the live schema, tables, and memory rows. Safe by default and zero custom proxy.
+
+### Amazon Bedrock (reasoning + embeddings)
+
+Two Bedrock models drive the agent:
+- **amazon.nova-micro-v1:0** via the Converse API (`toolConfig`) runs the agentic tool-call loop: it reads the question, decides which CockroachDB tools to call (`search_memory`, `get_emergency_summary`, `get_patient_documents`), and synthesizes sourced answers. It also extracts structured medical facts from uploaded documents.
+- **amazon.titan-embed-text-v2:0** produces the 1024-d embeddings that feed the HNSW index in both the ingest Lambda and the retrieval path.
+
+The model only ever answers from what the CockroachDB tools return, so every claim traces back to a stored fact.
+
+### AWS Lambda + S3 + CloudWatch (serverless ingestion)
+
+Clinicians upload charts and notes directly to S3 (`cairn-drops`) via presigned URLs (`lib/s3.ts`). An S3 object-created event triggers the `continuity-ingest-document` Lambda (`lambdas/ingest-document`), which reads the document, has Nova extract structured facts, embeds each fact with Titan, and inserts vector rows into `memory_entries` plus a `documents` row. CloudWatch provides logs and metrics for every invoke.
+
+The pipeline is genuinely event-driven, no polling or schedules: storage (S3), compute (Lambda), and intelligence (Bedrock) converge on one write to the CockroachDB memory layer, which the agent can immediately retrieve through the vector index.
 
 ---
 
