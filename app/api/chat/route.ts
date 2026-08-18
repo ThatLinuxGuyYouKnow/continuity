@@ -1,0 +1,168 @@
+import { NextRequest, NextResponse } from "next/server";
+import { bedrockConfigured, chatWithTools, type AgentTool } from "@/lib/bedrock";
+import {
+  logAudit,
+  getPatient,
+  getEmergencySummary,
+  getPatientDocuments,
+  searchMemory,
+  type MemoryHit,
+} from "@/lib/continuity";
+
+export const runtime = "nodejs";
+
+const MAX_AGENT_STEPS = 3;
+
+const TOOLS: AgentTool[] = [
+  {
+    name: "search_memory",
+    description:
+      "Semantic (vector) + keyword search over the patient's persistent memory in CockroachDB (memory_entries, HNSW-indexed). Use to retrieve facts, conditions, medications, allergies, or past conversations.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "What to search for in the patient's memory" },
+        limit: { type: "integer", description: "Max results (default 5)" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_emergency_summary",
+    description:
+      "Return the patient's emergency summary (allergies, medications, conditions, emergency contacts). Call when the question involves urgent care, emergencies, or anything needing immediate clinical context.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_patient_documents",
+    description:
+      "List the patient's uploaded source documents (charts, notes, labs) with extracted text snippets from S3 ingestion. Call when the question references a specific document or needs verification against source material.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", description: "Max documents (default 5)" },
+      },
+    },
+  },
+];
+
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => null);
+  const message = String(body?.message ?? "").trim();
+  const mrn = String(body?.mrn ?? "LB-2241-887");
+
+  if (!message) {
+    return NextResponse.json({ error: "message is required" }, { status: 400 });
+  }
+
+  const patient = await getPatient(mrn);
+  if (!patient) {
+    return NextResponse.json({ error: "patient not found" }, { status: 404 });
+  }
+
+  const initialHits = await searchMemory(message, patient.id);
+  const context =
+    initialHits.length > 0
+      ? initialHits
+          .map(
+            (h, i) =>
+              `${i + 1}. [${h.category}] ${h.fact} (source: ${h.source}, confidence: ${Math.round(
+                h.confidence * 100
+              )}%, ${new Date(h.extracted_at).toLocaleDateString()})`
+          )
+          .join("\n")
+      : "No initial matches. Use search_memory for a deeper search, or ask the user for more detail.";
+
+  const system = `You are Continuity, an agentic clinical memory assistant for patient ${patient.name} (MRN ${patient.mrn}).
+The patient's persistent memory lives in CockroachDB and is retrieved through your tools.
+Rules:
+- Answer ONLY from facts you retrieve with your tools. Never invent clinical details.
+- Use the initial memory retrieval above as your starting context, and call tools to gather more: search_memory for specific facts, get_emergency_summary for urgent care context, get_patient_documents to verify against source documents.
+- If the retrieved facts do not answer the question, say so and ask a clarifying question.
+- Keep answers concise, clinically useful, and cite the source when you can.`;
+
+  let reply: string | null = null;
+  let steps = 0;
+  let agentMode = false;
+
+  if (bedrockConfigured()) {
+    const messages: Array<Record<string, unknown>> = [
+      { role: "user", content: [{ text: `Patient question: ${message}\n\nInitial memory retrieval:\n${context}` }] },
+    ];
+
+    while (steps < MAX_AGENT_STEPS) {
+      steps++;
+      const step = await chatWithTools({ system, messages, tools: TOOLS });
+
+      if (step.toolCalls.length === 0) {
+        reply = step.text;
+        agentMode = true;
+        break;
+      }
+
+      messages.push({ role: "assistant", content: step.rawContent });
+
+      const results = [];
+      for (const call of step.toolCalls) {
+        let result: unknown;
+        try {
+          switch (call.name) {
+            case "search_memory":
+              result = await searchMemory(String(call.input.query ?? message), patient.id, Number(call.input.limit) || 5);
+              break;
+            case "get_emergency_summary":
+              result = (await getEmergencySummary(patient.id)) ?? { error: "no emergency summary available" };
+              break;
+            case "get_patient_documents": {
+              const docs = await getPatientDocuments(patient.id, Number(call.input.limit) || 5);
+              result = docs.map((d) => ({
+                id: d.id,
+                doc_type: d.doc_type,
+                s3_key: d.s3_key,
+                uploaded_at: d.uploaded_at,
+                snippet: d.extracted_text ? d.extracted_text.slice(0, 1200) : null,
+              }));
+              break;
+            }
+            default:
+              result = { error: `unknown tool: ${call.name}` };
+          }
+        } catch (err) {
+          result = { error: err instanceof Error ? err.message : String(err) };
+        }
+        results.push({ toolUseId: call.toolUseId, content: [{ json: result }], status: "success" });
+      }
+
+      messages.push({
+        role: "user",
+        content: results.map((r) => ({ toolResult: r })),
+      });
+    }
+  }
+
+  if (!reply) {
+    reply =
+      initialHits.length === 0
+        ? "I could not find anything in the patient memory that matches that question."
+        : `From ${patient.name}'s memory (retrieved via CockroachDB):\n${initialHits
+            .slice(0, 3)
+            .map((h: MemoryHit) => `- ${h.fact}`)
+            .join("\n")}`;
+  }
+
+  await logAudit({
+    actor_type: "agent",
+    action: "query",
+    resource: "memory_entries",
+    patient_id: patient.id,
+    region: patient.home_region,
+    allowed: true,
+  });
+
+  return NextResponse.json({
+    reply,
+    mode: agentMode ? "bedrock-agent" : bedrockConfigured() ? "bedrock" : "db-keyword",
+    steps,
+    hits: initialHits.map((h) => ({ category: h.category, fact: h.fact, confidence: h.confidence })),
+  });
+}

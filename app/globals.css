@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: "Inter", system-ui, sans-serif;
+}
+
+body {
+  color: #0a1628;
+  background: #eceff3;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .card {
+    @apply rounded-3xl bg-white p-6 shadow-sm;
+  }
+
+  .card-soft {
+    @apply rounded-3xl border border-white/10 bg-white/80 p-6 backdrop-blur;
+  }
+}
