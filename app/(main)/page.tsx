@@ -4,14 +4,14 @@ import { AuditSummary } from "@/components/audit-summary";
 import { RecentConversations } from "@/components/recent-conversations";
 import { StatCard } from "@/components/stat-card";
 import { currentPatient } from "@/lib/data";
+import { getOverview } from "@/lib/continuity";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   let data: any = {};
   try {
-    const res = await fetch("/api/overview", { cache: "no-store" });
-    if (res.ok) data = await res.json();
+    data = (await getOverview(currentPatient.mrn)) ?? {};
   } catch {
     data = {};
   }

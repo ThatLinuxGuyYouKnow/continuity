@@ -1,12 +1,13 @@
 import { ShieldCheck, AlertCircle, Eye, Lock } from "lucide-react";
+import { getOverview } from "@/lib/continuity";
+import { currentPatient } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 export default async function CompliancePage() {
   let data: any = {};
   try {
-    const res = await fetch("/api/overview", { cache: "no-store" });
-    if (res.ok) data = await res.json();
+    data = (await getOverview(currentPatient.mrn)) ?? {};
   } catch {
     data = {};
   }

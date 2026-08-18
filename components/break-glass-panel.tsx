@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, Globe, Lock } from "lucide-react";
+import { ChatPanel } from "@/components/chat-panel";
 
 const REASONS = [
   "ER_TRIAGE_SUSPECTED_ANAPHYLAXIS",
@@ -110,42 +111,51 @@ export function BreakGlassPanel({
       )}
 
       {result && (
-        <div className="mt-4 rounded-2xl border border-lime-350/40 bg-lime-350/10 p-4">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-lime-350" />
-            <p className="text-sm font-semibold">
-              Session {String(result.eventId).slice(0, 8)} opened · expires in{" "}
-              {result.expiresInMinutes} minutes
+        <>
+          <div className="mt-4 rounded-2xl border border-lime-350/40 bg-lime-350/10 p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-lime-350" />
+              <p className="text-sm font-semibold">
+                Session {String(result.eventId).slice(0, 8)} opened · expires in{" "}
+                {result.expiresInMinutes} minutes
+              </p>
+            </div>
+            <p className="mt-1 text-xs text-gray-400">
+              Audited with reason code · region {region} · patient notified
             </p>
+            <div className="mt-3 grid gap-2 text-sm">
+              {result.summary.allergies?.length > 0 && (
+                <p>
+                  <span className="font-semibold text-red-400">Allergies: </span>
+                  {result.summary.allergies.join(", ")}
+                </p>
+              )}
+              {result.summary.medications?.length > 0 && (
+                <p>
+                  <span className="font-semibold">Medications: </span>
+                  {result.summary.medications.join(", ")}
+                </p>
+              )}
+              {result.summary.conditions?.length > 0 && (
+                <p>
+                  <span className="font-semibold text-violet-350">Conditions: </span>
+                  {result.summary.conditions.join(", ")}
+                </p>
+              )}
+              <p className="flex items-center gap-1 text-xs text-gray-400">
+                <Globe className="h-3 w-3" /> Blood type {result.summary.blood_type} ·
+                replicated across all regions
+              </p>
+            </div>
           </div>
-          <p className="mt-1 text-xs text-gray-400">
-            Audited with reason code · region {region} · patient notified
-          </p>
-          <div className="mt-3 grid gap-2 text-sm">
-            {result.summary.allergies?.length > 0 && (
-              <p>
-                <span className="font-semibold text-red-400">Allergies: </span>
-                {result.summary.allergies.join(", ")}
-              </p>
-            )}
-            {result.summary.medications?.length > 0 && (
-              <p>
-                <span className="font-semibold">Medications: </span>
-                {result.summary.medications.join(", ")}
-              </p>
-            )}
-            {result.summary.conditions?.length > 0 && (
-              <p>
-                <span className="font-semibold text-violet-350">Conditions: </span>
-                {result.summary.conditions.join(", ")}
-              </p>
-            )}
-            <p className="flex items-center gap-1 text-xs text-gray-400">
-              <Globe className="h-3 w-3" /> Blood type {result.summary.blood_type} ·
-              replicated across all regions
-            </p>
+
+          <div className="mt-6 border-t border-white/10 pt-6">
+            <h4 className="mb-3 text-sm font-semibold text-white">Emergency Agent Chat</h4>
+            <div className="h-[450px]">
+              <ChatPanel mrn={mrn} />
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

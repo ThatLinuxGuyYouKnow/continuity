@@ -31,7 +31,7 @@ export type AccessEvent = {
 export const currentPatient: Patient = {
   id: "p-001",
   name: "Lucas Bennett",
-  mrn: "MRN-2024-8812",
+  mrn: "LB-2241-887",
   dob: "1989-03-14",
   gender: "Male",
   bloodType: "O+",

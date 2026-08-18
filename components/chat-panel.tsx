@@ -11,11 +11,11 @@ interface Msg {
   widgets?: WidgetData[];
 }
 
-export function ChatPanel() {
+export function ChatPanel({ mrn = "LB-2241-887" }: { mrn?: string }) {
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "agent",
-      text: "Hi, I'm the Continuity memory agent. Ask me about Lucas's history, allergies, medications — I'll retrieve from the CockroachDB memory store.",
+      text: "Hi, I'm the Continuity memory agent. Ask me about the patient's history, allergies, medications — I'll retrieve from the CockroachDB memory store.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -36,7 +36,7 @@ export function ChatPanel() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, mrn: "LB-2241-887" }),
+        body: JSON.stringify({ message: text, mrn }),
       });
       const data = await res.json();
       setMessages((m) => [
