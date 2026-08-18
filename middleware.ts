@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   "/e", // break-glass: deliberately accessible without auth (capability URL)
   "/api/auth",
   "/api/emergency", // break-glass API: must work for un-authed scanners
+  "/api/chat", // self-authorizes: valid break-glass token OR Supabase session
 ];
 
 export async function middleware(request: NextRequest) {

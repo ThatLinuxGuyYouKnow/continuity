@@ -16,9 +16,11 @@ const REGIONS = ["us-east-1", "us-west-2", "eu-central-1"];
 export function BreakGlassPanel({
   mrn,
   patientName,
+  breakGlassToken,
 }: {
   mrn: string;
   patientName: string;
+  breakGlassToken?: string;
 }) {
   const [reason, setReason] = useState(REASONS[0]);
   const [region, setRegion] = useState("us-east-1");
@@ -151,8 +153,8 @@ export function BreakGlassPanel({
 
           <div className="mt-6 border-t border-white/10 pt-6">
             <h4 className="mb-3 text-sm font-semibold text-white">Emergency Agent Chat</h4>
-            <div className="h-[450px]">
-              <ChatPanel mrn={mrn} />
+            <div className="h-[450px] max-h-[70vh] min-h-[320px]">
+              <ChatPanel mrn={mrn} breakGlassToken={breakGlassToken} />
             </div>
           </div>
         </>

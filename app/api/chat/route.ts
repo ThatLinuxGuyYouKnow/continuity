@@ -8,6 +8,8 @@ import {
   searchMemory,
   type MemoryHit,
 } from "@/lib/continuity";
+import { verifyBreakGlassToken, isBreakGlassLinkRevoked } from "@/lib/breakglass";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -55,9 +57,33 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const message = String(body?.message ?? "").trim();
   const mrn = String(body?.mrn ?? "LB-2241-887");
+  const breakGlassToken = body?.breakGlassToken ? String(body?.breakGlassToken) : null;
 
   if (!message) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
+  }
+
+  // Authorization: a valid break-glass token (capability URL) grants access for
+  // the exact patient MRN it was signed for; otherwise require a Supabase session.
+  let actorType: string | null = null;
+  if (breakGlassToken) {
+    const verified = verifyBreakGlassToken(breakGlassToken);
+    if (!verified || verified.mrn !== mrn) {
+      return NextResponse.json({ error: "invalid break-glass token" }, { status: 401 });
+    }
+    if (await isBreakGlassLinkRevoked(breakGlassToken)) {
+      return NextResponse.json({ error: "break-glass link revoked" }, { status: 403 });
+    }
+    actorType = "break_glass";
+  } else {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    actorType = "clinician";
   }
 
   const patient = await getPatient(mrn);
@@ -178,7 +204,7 @@ Rules:
   }
 
   await logAudit({
-    actor_type: "agent",
+    actor_type: actorType ?? "agent",
     action: "query",
     resource: "memory_entries",
     patient_id: patient.id,

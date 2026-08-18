@@ -76,14 +76,14 @@ export function PatientProfileWidget({ data }: { data: any }) {
   return (
     <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
       <WidgetHeader icon={User} title="Patient Profile" />
-      <div className="mt-4 flex items-start gap-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-450 to-violet-550 text-lg font-bold text-white">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-450 to-violet-550 text-lg font-bold text-white">
           {initials}
         </div>
-        <div className="flex-1 space-y-1.5">
-          <p className="text-base font-bold text-navy-900">{data.name}</p>
+        <div className="flex-1 space-y-1.5 min-w-0">
+          <p className="text-base font-bold text-navy-900 break-words">{data.name}</p>
           {data.mrn && (
-            <p className="text-xs text-gray-500">
+            <p className="break-all text-xs text-gray-500">
               MRN <span className="font-mono font-medium text-navy-900">{data.mrn}</span>
             </p>
           )}
@@ -112,7 +112,7 @@ export function PatientProfileWidget({ data }: { data: any }) {
             )}
           </div>
         </div>
-        <div className="rounded-xl bg-surface px-3 py-2 text-center">
+        <div className="shrink-0 self-start rounded-xl bg-surface px-3 py-2 text-center">
           <p className="text-[10px] font-medium uppercase text-gray-400">Region</p>
           <p className="mt-0.5 text-xs font-bold text-navy-900">{data.home_region ?? "—"}</p>
         </div>

@@ -55,8 +55,8 @@ export default async function EmergencyAccessPage({
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center p-6">
-      <div className="rounded-3xl bg-white/5 p-8">
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center p-4 sm:p-6">
+      <div className="rounded-3xl bg-white/5 p-5 sm:p-8">
         <div className="flex items-center gap-3">
           <AlertTriangle className="h-8 w-8 text-lime-350" />
           <div>
@@ -76,7 +76,7 @@ export default async function EmergencyAccessPage({
           </span>
         </div>
 
-        <BreakGlassPanel mrn={token.mrn} patientName={patient.name} />
+        <BreakGlassPanel mrn={token.mrn} patientName={patient.name} breakGlassToken={t} />
       </div>
     </div>
   );

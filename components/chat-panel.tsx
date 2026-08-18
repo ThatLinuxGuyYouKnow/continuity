@@ -11,7 +11,13 @@ interface Msg {
   widgets?: WidgetData[];
 }
 
-export function ChatPanel({ mrn = "LB-2241-887" }: { mrn?: string }) {
+export function ChatPanel({
+  mrn = "LB-2241-887",
+  breakGlassToken,
+}: {
+  mrn?: string;
+  breakGlassToken?: string;
+}) {
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "agent",
@@ -36,9 +42,16 @@ export function ChatPanel({ mrn = "LB-2241-887" }: { mrn?: string }) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, mrn }),
+        body: JSON.stringify({ message: text, mrn, breakGlassToken }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        setMessages((m) => [
+          ...m,
+          { role: "agent", text: data.error ?? `Request failed (${res.status})` },
+        ]);
+        return;
+      }
       setMessages((m) => [
         ...m,
         {
@@ -67,7 +80,7 @@ export function ChatPanel({ mrn = "LB-2241-887" }: { mrn?: string }) {
         <p className="text-xs text-gray-500">CockroachDB vector memory + Bedrock Nova</p>
       </div>
 
-      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-4">
         {messages.map((m, i) => (
           <div key={i} className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
             <div
@@ -77,21 +90,21 @@ export function ChatPanel({ mrn = "LB-2241-887" }: { mrn?: string }) {
             >
               {m.role === "agent" ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}
             </div>
-            <div className={`max-w-[85%] min-w-0 ${m.role === "agent" ? "" : "flex flex-col items-end"}`}>
+            <div className={`max-w-[85%] min-w-0 sm:max-w-[75%] ${m.role === "agent" ? "" : "flex flex-col items-end"}`}>
               <div
-                className={`rounded-2xl px-4 py-2.5 text-sm ${
+                className={`break-words rounded-2xl px-4 py-2.5 text-sm ${
                   m.role === "agent" ? "bg-muted text-gray-800" : "bg-dark text-white"
                 }`}
               >
                 {m.text}
               </div>
               {m.widgets && m.widgets.length > 0 && (
-                <div className="mt-3 space-y-3">
+                <div className="mt-3 w-full space-y-3">
                   {renderWidgets(m.widgets)}
                 </div>
               )}
               {m.meta && (
-                <p className="mt-1 text-[10px] text-gray-400">{m.meta}</p>
+                <p className="mt-1 break-words text-[10px] text-gray-400">{m.meta}</p>
               )}
             </div>
           </div>
