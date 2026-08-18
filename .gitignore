@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+lambdas/**/node_modules/
+
+# next.js build output
+.next/
+out/
+
+# env / secrets
+.env*.local
+!.env.local.example
+
+# build artifacts
+lambdas/*.zip
+
+# misc
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
