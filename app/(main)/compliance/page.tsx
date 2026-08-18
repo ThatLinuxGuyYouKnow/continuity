@@ -3,10 +3,13 @@ import { ShieldCheck, AlertCircle, Eye, Lock } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function CompliancePage() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/overview`, {
-    cache: "no-store",
-  });
-  const data = await res.json();
+  let data: any = {};
+  try {
+    const res = await fetch("/api/overview", { cache: "no-store" });
+    if (res.ok) data = await res.json();
+  } catch {
+    data = {};
+  }
   const events: any[] = data.audit ?? [];
 
   const total = events.length;

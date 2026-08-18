@@ -1,4 +1,5 @@
-import { createHmac, randomUUID, timingSafeEqual } from "crypto";
+import { createHmac, createHash, randomUUID, timingSafeEqual } from "crypto";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const BREAK_GLASS_TTL_MINUTES = 60;
 
@@ -52,4 +53,70 @@ export function verifyBreakGlassToken(token: string): VerifiedToken | null {
   }
 
   return { mrn: payload.mrn, exp: payload.exp, jti: payload.jti };
+}
+
+const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+
+export function isLocalhostHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+export async function storeBreakGlassLink({
+  token,
+  mrn,
+  url,
+  createdBy,
+  expiresAt,
+}: {
+  token: string;
+  mrn: string;
+  url: string;
+  createdBy: string;
+  expiresAt: string;
+}): Promise<{ ok: boolean; id: string | null }> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("break_glass_links")
+    .insert({
+      token_hash: hashToken(token),
+      mrn,
+      url,
+      created_by: createdBy,
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("break_glass_links insert failed:", error.message);
+    return { ok: false, id: null };
+  }
+  return { ok: true, id: data.id };
+}
+
+export async function isBreakGlassLinkRevoked(token: string): Promise<boolean> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("break_glass_links")
+    .select("status")
+    .eq("token_hash", hashToken(token))
+    .maybeSingle();
+  return data?.status === "revoked";
+}
+
+export async function revokeBreakGlassLink(
+  token: string,
+  revokedBy: string
+): Promise<{ ok: boolean; mrn: string | null }> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("break_glass_links")
+    .update({ status: "revoked", revoked_at: new Date().toISOString(), revoked_by: revokedBy })
+    .eq("token_hash", hashToken(token))
+    .select("mrn")
+    .single();
+  if (error) {
+    console.error("break_glass_links revoke failed:", error.message);
+    return { ok: false, mrn: null };
+  }
+  return { ok: true, mrn: data.mrn };
 }

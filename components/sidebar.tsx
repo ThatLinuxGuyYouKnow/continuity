@@ -47,7 +47,6 @@ export function Sidebar() {
   return (
     <aside className="flex w-64 flex-col bg-navy-800 text-white">
       <div className="flex items-center gap-3 px-6 py-7">
-        <img src="/logo-icon-white.png" alt="" className="h-9 w-auto" />
         <img src="/logo-full-white.png" alt="Continuity" className="h-6 w-auto" />
       </div>
 

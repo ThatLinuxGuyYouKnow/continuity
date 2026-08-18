@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User } from "lucide-react";
+import { renderWidgets, type WidgetData } from "@/components/chat-widgets";
 
 interface Msg {
   role: "agent" | "user";
   text: string;
   meta?: string;
+  widgets?: WidgetData[];
 }
 
 export function ChatPanel() {
@@ -46,8 +48,9 @@ export function ChatPanel() {
             data.mode === "bedrock-agent"
               ? `Bedrock agent · ${data.steps} tool step${data.steps === 1 ? "" : "s"} · HNSW vector memory`
               : data.mode === "bedrock"
-              ? "Claude + HNSW vector search"
+              ? "Nova + HNSW vector search"
               : "CockroachDB keyword retrieval",
+          widgets: data.widgets ?? [],
         },
       ]);
     } catch (e) {
@@ -61,7 +64,7 @@ export function ChatPanel() {
     <div className="flex h-full flex-col rounded-3xl bg-white shadow-sm">
       <div className="border-b border-gray-100 p-4">
         <h3 className="font-semibold">Agent Chat</h3>
-        <p className="text-xs text-gray-500">CockroachDB vector memory + Bedrock Claude</p>
+        <p className="text-xs text-gray-500">CockroachDB vector memory + Bedrock Nova</p>
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
@@ -74,14 +77,19 @@ export function ChatPanel() {
             >
               {m.role === "agent" ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}
             </div>
-            <div className={`max-w-[80%] ${m.role === "agent" ? "" : "flex flex-col items-end"}`}>
+            <div className={`max-w-[85%] min-w-0 ${m.role === "agent" ? "" : "flex flex-col items-end"}`}>
               <div
                 className={`rounded-2xl px-4 py-2.5 text-sm ${
-                  m.role === "agent" ? "bg-gray-100 text-gray-800" : "bg-dark text-white"
+                  m.role === "agent" ? "bg-muted text-gray-800" : "bg-dark text-white"
                 }`}
               >
                 {m.text}
               </div>
+              {m.widgets && m.widgets.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  {renderWidgets(m.widgets)}
+                </div>
+              )}
               {m.meta && (
                 <p className="mt-1 text-[10px] text-gray-400">{m.meta}</p>
               )}
@@ -93,7 +101,7 @@ export function ChatPanel() {
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-250">
               <Bot className="h-4 w-4" />
             </div>
-            <div className="rounded-2xl bg-gray-100 px-4 py-2.5 text-sm text-gray-500">
+            <div className="rounded-2xl bg-muted px-4 py-2.5 text-sm text-gray-500">
               <span className="inline-flex gap-1">
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" />
                 <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
@@ -112,7 +120,7 @@ export function ChatPanel() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
             placeholder="Ask about patient memory..."
-            className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none focus:border-violet-450 focus:ring-1 focus:ring-violet-450"
+            className="flex-1 rounded-xl border border-gray-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-violet-450 focus:ring-1 focus:ring-violet-450"
           />
           <button
             onClick={send}

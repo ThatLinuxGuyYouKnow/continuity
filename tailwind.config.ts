@@ -27,7 +27,9 @@ const config: Config = {
           600: "#1A2940",
         },
         dark: "#0A1628",
-        panel: "#ECEFF3",
+        surface: "#f8f9fb",
+        muted: "#f0f2f5",
+        panel: "#f4f5f7",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],

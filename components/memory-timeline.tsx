@@ -25,7 +25,7 @@ export function MemoryTimeline({ data }: { data: any[] }) {
         <p className="py-8 text-center text-sm text-gray-400">No memory facts yet.</p>
       ) : (
         <div className="relative space-y-6 pl-2">
-          <div className="absolute bottom-2 left-[23px] top-2 w-0.5 bg-gray-100" />
+          <div className="absolute bottom-2 left-[23px] top-2 w-0.5 bg-muted" />
           {events.map((event) => {
             const style = categoryStyles[event.category] ?? categoryStyles.note;
             const Icon = style.icon;

@@ -78,7 +78,7 @@ export function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="clinician@hospital.org"
-            className="h-12 w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 text-sm text-navy-900 outline-none transition-all placeholder:text-gray-400 focus:border-violet-450 focus:bg-white focus:ring-4 focus:ring-violet-450/10"
+            className="h-12 w-full rounded-2xl border border-gray-200 bg-surface px-4 text-sm text-navy-900 outline-none transition-all placeholder:text-gray-400 focus:border-violet-450 focus:bg-white focus:ring-4 focus:ring-violet-450/10"
           />
         </div>
 
@@ -93,12 +93,12 @@ export function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="••••••••"
-              className="h-12 w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 pr-11 text-sm text-navy-900 outline-none transition-all placeholder:text-gray-400 focus:border-violet-450 focus:bg-white focus:ring-4 focus:ring-violet-450/10"
+              className="h-12 w-full rounded-2xl border border-gray-200 bg-surface px-4 pr-11 text-sm text-navy-900 outline-none transition-all placeholder:text-gray-400 focus:border-violet-450 focus:bg-white focus:ring-4 focus:ring-violet-450/10"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-400 hover:bg-muted hover:text-gray-600"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>

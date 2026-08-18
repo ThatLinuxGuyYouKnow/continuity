@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AlertTriangle, QrCode, ShieldCheck, Globe, Lock, CheckCircle2, RefreshCw } from "lucide-react";
+import { AlertTriangle, QrCode, ShieldCheck, Globe, Lock, CheckCircle2, RefreshCw, Ban } from "lucide-react";
 
 const REASONS = [
   "ER_TRIAGE_SUSPECTED_ANAPHYLAXIS",
@@ -20,14 +20,19 @@ export default function EmergencyPage() {
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<{
     url: string;
+    token: string;
     qrDataUrl: string;
     expiresAt: string;
     expiresInMinutes: number;
+    stored: boolean;
   } | null>(null);
   const [linkLoading, setLinkLoading] = useState(true);
+  const [revoked, setRevoked] = useState(false);
+  const [revoking, setRevoking] = useState(false);
 
   const loadLink = async () => {
     setLinkLoading(true);
+    setRevoked(false);
     try {
       const res = await fetch("/api/emergency/link");
       if (!res.ok) throw new Error("link request failed");
@@ -42,6 +47,25 @@ export default function EmergencyPage() {
   useEffect(() => {
     loadLink();
   }, []);
+
+  const revoke = async () => {
+    if (!link) return;
+    setRevoking(true);
+    try {
+      const res = await fetch("/api/emergency/link", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: link.token }),
+      });
+      if (res.ok) {
+        setRevoked(true);
+      }
+    } catch {
+      // keep current state on network failure
+    } finally {
+      setRevoking(false);
+    }
+  };
 
   const trigger = async () => {
     setLoading(true);
@@ -88,24 +112,44 @@ export default function EmergencyPage() {
             {linkLoading ? (
               <p className="text-sm text-gray-400">Generating link...</p>
             ) : link ? (
-              <div className="text-center text-dark">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={link.qrDataUrl}
-                  alt="Medical ID QR code"
-                  className="mx-auto h-56 w-56 rounded-lg"
-                />
-                <p className="mt-2 break-all font-mono text-[11px] leading-tight text-gray-500">
-                  {link.url}
-                </p>
-              </div>
+              revoked ? (
+                <div className="text-center text-dark">
+                  <Ban className="mx-auto h-14 w-14 text-red-500" />
+                  <p className="mt-3 text-sm font-semibold">Link revoked</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Any device scanning this QR is now denied access.
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center text-dark">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={link.qrDataUrl}
+                    alt="Medical ID QR code"
+                    className="mx-auto h-56 w-56 rounded-lg"
+                  />
+                  <p className="mt-2 break-all font-mono text-[11px] leading-tight text-gray-500">
+                    {link.url}
+                  </p>
+                </div>
+              )
             ) : (
               <p className="text-sm text-red-500">Failed to generate link</p>
             )}
           </div>
+          {!linkLoading && link && !revoked && (
+            <button
+              onClick={revoke}
+              disabled={revoking}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-red-500/90 py-2 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+            >
+              <Ban className="h-3.5 w-3.5" />
+              {revoking ? "Revoking..." : "Revoke link"}
+            </button>
+          )}
           <button
             onClick={loadLink}
-            disabled={linkLoading}
+            disabled={linkLoading || revoking}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 py-2 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-50"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -131,7 +175,7 @@ export default function EmergencyPage() {
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none focus:border-violet-450"
+                className="w-full rounded-xl border border-gray-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-violet-450"
               >
                 {REASONS.map((r) => (
                   <option key={r} value={r}>
@@ -148,7 +192,7 @@ export default function EmergencyPage() {
               <select
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none focus:border-violet-450"
+                className="w-full rounded-xl border border-gray-200 bg-surface px-4 py-2.5 text-sm outline-none focus:border-violet-450"
               >
                 {REGIONS.map((r) => (
                   <option key={r} value={r}>
@@ -220,7 +264,7 @@ export default function EmergencyPage() {
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           {REGIONS.map((r) => (
-            <div key={r} className="flex items-center gap-3 rounded-2xl bg-gray-50 p-4">
+            <div key={r} className="flex items-center gap-3 rounded-2xl bg-surface p-4">
               <Globe className="h-5 w-5 text-gray-400" />
               <div>
                 <p className="text-sm font-medium">{r}</p>

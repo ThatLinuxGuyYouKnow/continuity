@@ -46,6 +46,11 @@ const TOOLS: AgentTool[] = [
   },
 ];
 
+interface Widget {
+  type: string;
+  data: Record<string, unknown>;
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const message = String(body?.message ?? "").trim();
@@ -85,6 +90,14 @@ Rules:
   let steps = 0;
   let agentMode = false;
 
+  const collectedHits: Array<{ category: string; fact: string; confidence: number; source: string }> = [];
+  let emergencyData: Record<string, unknown> | null = null;
+  let documentData: Array<Record<string, unknown>> | null = null;
+
+  for (const h of initialHits) {
+    collectedHits.push({ category: h.category, fact: h.fact, confidence: h.confidence, source: h.source });
+  }
+
   if (bedrockConfigured()) {
     const messages: Array<Record<string, unknown>> = [
       { role: "user", content: [{ text: `Patient question: ${message}\n\nInitial memory retrieval:\n${context}` }] },
@@ -107,21 +120,35 @@ Rules:
         let result: unknown;
         try {
           switch (call.name) {
-            case "search_memory":
-              result = await searchMemory(String(call.input.query ?? message), patient.id, Number(call.input.limit) || 5);
+            case "search_memory": {
+              const hits = await searchMemory(String(call.input.query ?? message), patient.id, Number(call.input.limit) || 5);
+              result = hits;
+              for (const h of hits) {
+                if (!collectedHits.some((c) => c.fact === h.fact)) {
+                  collectedHits.push({ category: h.category, fact: h.fact, confidence: h.confidence, source: h.source });
+                }
+              }
               break;
-            case "get_emergency_summary":
-              result = (await getEmergencySummary(patient.id)) ?? { error: "no emergency summary available" };
+            }
+            case "get_emergency_summary": {
+              const summary = (await getEmergencySummary(patient.id)) ?? { error: "no emergency summary available" };
+              result = summary;
+              if (!(summary as any).error) {
+                emergencyData = summary as Record<string, unknown>;
+              }
               break;
+            }
             case "get_patient_documents": {
               const docs = await getPatientDocuments(patient.id, Number(call.input.limit) || 5);
-              result = docs.map((d) => ({
+              const mapped = docs.map((d) => ({
                 id: d.id,
                 doc_type: d.doc_type,
                 s3_key: d.s3_key,
                 uploaded_at: d.uploaded_at,
                 snippet: d.extracted_text ? d.extracted_text.slice(0, 1200) : null,
               }));
+              result = mapped;
+              documentData = mapped;
               break;
             }
             default:
@@ -159,10 +186,50 @@ Rules:
     allowed: true,
   });
 
+  const widgets: Widget[] = [];
+
+  widgets.push({
+    type: "patient_profile",
+    data: {
+      name: patient.name,
+      mrn: patient.mrn,
+      dob: patient.dob,
+      blood_type: patient.blood_type,
+      home_region: patient.home_region,
+    },
+  });
+
+  if (collectedHits.length > 0) {
+    widgets.push({ type: "memory_hits", data: { hits: collectedHits } });
+
+    const avgConf = collectedHits.reduce((a, h) => a + h.confidence, 0) / collectedHits.length;
+    widgets.push({ type: "vector_analytics", data: { hits: collectedHits, avgConfidence: avgConf } });
+  }
+
+  if (emergencyData) {
+    if ((emergencyData.allergies as string[])?.length > 0) {
+      widgets.push({ type: "allergies", data: { allergies: emergencyData.allergies } });
+    }
+    if ((emergencyData.medications as string[])?.length > 0) {
+      widgets.push({ type: "medications", data: { medications: emergencyData.medications } });
+    }
+    if ((emergencyData.conditions as string[])?.length > 0) {
+      widgets.push({ type: "conditions", data: { conditions: emergencyData.conditions } });
+    }
+    if ((emergencyData.emergency_contacts as any[])?.length > 0) {
+      widgets.push({ type: "emergency_contacts", data: { emergency_contacts: emergencyData.emergency_contacts } });
+    }
+  }
+
+  if (documentData && documentData.length > 0) {
+    widgets.push({ type: "sources_evidence", data: { documents: documentData } });
+  }
+
   return NextResponse.json({
     reply,
     mode: agentMode ? "bedrock-agent" : bedrockConfigured() ? "bedrock" : "db-keyword",
     steps,
-    hits: initialHits.map((h) => ({ category: h.category, fact: h.fact, confidence: h.confidence })),
+    hits: collectedHits,
+    widgets,
   });
 }

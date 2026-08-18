@@ -1,5 +1,5 @@
 import { AlertTriangle, ShieldOff, Clock } from "lucide-react";
-import { verifyBreakGlassToken } from "@/lib/breakglass";
+import { verifyBreakGlassToken, isBreakGlassLinkRevoked } from "@/lib/breakglass";
 import { getPatient } from "@/lib/continuity";
 import { BreakGlassPanel } from "@/components/break-glass-panel";
 
@@ -20,6 +20,21 @@ export default async function EmergencyAccessPage({
           <p className="mt-2 text-sm text-gray-400">
             This break-glass link is signed, single-use in intent, and expires 60 minutes
             after it is generated. Ask the care team to mint a fresh Medical ID link.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (t && (await isBreakGlassLinkRevoked(t))) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-3xl bg-white/5 p-8 text-center">
+          <ShieldOff className="mx-auto h-12 w-12 text-red-400" />
+          <h1 className="mt-4 text-xl font-bold">Access link revoked</h1>
+          <p className="mt-2 text-sm text-gray-400">
+            This break-glass link was revoked by the care team. Ask them to mint a fresh
+            Medical ID link.
           </p>
         </div>
       </div>

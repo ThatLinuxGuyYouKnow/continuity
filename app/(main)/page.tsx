@@ -8,18 +8,22 @@ import { currentPatient } from "@/lib/data";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/overview`, {
-    cache: "no-store",
-  });
-  const data = await res.json();
+  let data: any = {};
+  try {
+    const res = await fetch("/api/overview", { cache: "no-store" });
+    if (res.ok) data = await res.json();
+  } catch {
+    data = {};
+  }
 
-  const facts = data.timeline?.length ?? 0;
-  const conversations = data.conversations?.length ?? 0;
-  const audit = data.audit ?? [];
+  const facts = data.counts?.memory ?? data.timeline?.length ?? 0;
+  const docCount = data.counts?.documents ?? 0;
+  const conversations = data.counts?.conversations ?? data.conversations?.length ?? 0;
+  const auditCount = data.counts?.audit ?? data.audit?.length ?? 0;
 
   const avgConfidence =
     facts > 0
-      ? Math.round((data.timeline.reduce((a: number, t: any) => a + t.confidence, 0) / facts) * 100)
+      ? Math.round((data.timeline.reduce((a: number, t: any) => a + t.confidence, 0) / Math.min(facts, data.timeline?.length ?? 1)) * 100)
       : 0;
 
   const today = new Date().toLocaleDateString("en-US", {
@@ -77,7 +81,7 @@ export default async function DashboardPage() {
         />
         <StatCard
           label="Audit Events"
-          value={audit.length.toString()}
+          value={auditCount.toString()}
           sub="Recent 10 in region"
           icon={FileText}
           accent="lime"
@@ -162,24 +166,54 @@ export default async function DashboardPage() {
               </span>
             </div>
             <div className="space-y-4">
-              {[
-                { label: "Conversations", value: 60, color: "bg-violet-450" },
-                { label: "Documents", value: 25, color: "bg-lime-450" },
-                { label: "Evidence", value: 15, color: "bg-navy-700" },
-              ].map((source) => (
-                <div key={source.label}>
-                  <div className="mb-1.5 flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-600">{source.label}</span>
-                    <span className="font-bold text-navy-900">{source.value}%</span>
-                  </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className={`h-full rounded-full ${source.color}`}
-                      style={{ width: `${source.value}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+              {(data.sourceBreakdown ?? []).length > 0
+                ? (() => {
+                    const total = (data.sourceBreakdown as any[]).reduce(
+                      (a: number, s: any) => a + s.count,
+                      0
+                    );
+                    const colors: Record<string, string> = {
+                      conversation: "bg-violet-450",
+                      document: "bg-lime-450",
+                      evidence: "bg-navy-700",
+                      lab: "bg-sky-400",
+                      note: "bg-amber-400",
+                      default: "bg-gray-400",
+                    };
+                    return (data.sourceBreakdown as any[]).map((s: any) => {
+                      const pct = total > 0 ? Math.round((s.count / total) * 100) : 0;
+                      const color = colors[s.source] ?? colors.default;
+                      return (
+                        <div key={s.source}>
+                          <div className="mb-1.5 flex items-center justify-between text-sm">
+                            <span className="font-medium text-gray-600 capitalize">{s.source}</span>
+                            <span className="font-bold text-navy-900">{pct}%</span>
+                          </div>
+                          <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                            <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()
+                : [
+                    { label: "Conversations", value: 60, color: "bg-violet-450" },
+                    { label: "Documents", value: 25, color: "bg-lime-450" },
+                    { label: "Evidence", value: 15, color: "bg-navy-700" },
+                  ].map((source) => (
+                    <div key={source.label}>
+                      <div className="mb-1.5 flex items-center justify-between text-sm">
+                        <span className="font-medium text-gray-600">{source.label}</span>
+                        <span className="font-bold text-navy-900">{source.value}%</span>
+                      </div>
+                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full ${source.color}`}
+                          style={{ width: `${source.value}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
             </div>
           </div>
 
